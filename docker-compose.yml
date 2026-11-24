@@ -1,0 +1,58 @@
+services:
+  nginx:
+    image: nginx:alpine
+    container_name: aiy-web-nginx
+    ports:
+      - "8088:80"
+    volumes:
+      - ./nginx/conf.d:/etc/nginx/conf.d:ro
+      - ./web/site1:/usr/share/nginx/html/site1:ro
+      - ./web/site2:/usr/share/nginx/html/site2:ro
+    depends_on: [nodered]
+    restart: unless-stopped
+
+  nodered:
+    image: nodered/node-red:latest
+    container_name: aiy-web-nodered
+    ports:
+      - "1881:1880"
+    volumes:
+      - ./nodered:/data
+    restart: unless-stopped
+
+  mariadb:
+    image: mariadb:11
+    container_name: aiy-web-mariadb
+    environment:
+      MARIADB_ROOT_PASSWORD: ${MARIADB_ROOT_PASSWORD}
+      MARIADB_DATABASE: ${MARIADB_DATABASE}
+      MARIADB_USER: ${MARIADB_USER}
+      MARIADB_PASSWORD: ${MARIADB_PASSWORD}
+    ports:
+      - "3307:3306"
+    volumes:
+      - mariadb_data:/var/lib/mysql
+      - ./db/init:/docker-entrypoint-initdb.d:ro
+    restart: unless-stopped
+
+  phpmyadmin:
+    image: phpmyadmin:latest
+    container_name: aiy-web-phpmyadmin
+    environment:
+      PMA_HOST: mariadb
+      PMA_PORT: 3306
+    ports:
+      - "8090:80"
+    depends_on: [mariadb]
+    restart: unless-stopped
+
+  cloudflared:
+    image: cloudflare/cloudflared:latest
+    container_name: aiy-web-cloudflared
+    profiles: ["tunnel"]
+    command: tunnel --no-autoupdate run --token ${CLOUDFLARED_TUNNEL_TOKEN}
+    depends_on: [nginx]
+    restart: unless-stopped
+
+volumes:
+  mariadb_data:
